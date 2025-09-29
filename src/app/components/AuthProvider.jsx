@@ -1,15 +1,15 @@
 "use client"
 import { useUser } from '@stackframe/stack';
 import { useMutation } from 'convex/react';
-import { User } from 'lucide-react';
-
 import React, { useEffect, useState } from 'react';
-
+import { api } from '../../../convex/_generated/api';
+import { UserContext } from '../_context/UserContext';
 
 function AuthProvider({ children }) {
   const user = useUser();
   const createUser = useMutation(api.users.CreateUser);
-  const [userData, setUserData] = useState();
+  const [userData, setUserData] = useState(null);
+
   const CreateNewUser = async () => {
     if (!user) return;
     try {
@@ -31,13 +31,11 @@ function AuthProvider({ children }) {
     }
   }, [user]);
 
-  return <>
-    <div>
-      <UserContext.Provider value={{ user, userData, setUserData }}>
-        {children}
-      </UserContext.Provider>
-    </div>
-  </>;
+  return (
+    <UserContext.Provider value={{ user, userData, setUserData }}>
+      {children}
+    </UserContext.Provider>
+  );
 }
 
 export default AuthProvider;

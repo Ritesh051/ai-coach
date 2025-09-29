@@ -8,4 +8,10 @@ export default defineSchema({
         credits: v.number(),
         subscriptionId: v.optional(v.string())
     }),
-})
+    InterviewRoom: defineTable({
+        coachOptions: v.string(),
+        topic: v.string(),
+        expertName: v.string(),
+        conversation: v.optional(v.any())
+    })
+});

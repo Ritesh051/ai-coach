@@ -15,11 +15,14 @@ import { Button } from '@/components/ui/button';
 import { useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { LoaderCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 function Dialogbox({ children, ExpertsList }) {
 
     const [selectedExpert, setSelectedExpert] = useState();
     const [topic, setTopic] = useState('');
     const [Loading, setLoading] = useState(false);
+    const [openDialog, setOpenDailog] = useState(false);
+    const router  = useRouter();
     const createDiscussionRoom = useMutation(api.InterviewRoom.createNewRoom);
     
     const onClickNext = async () => {
@@ -31,10 +34,12 @@ function Dialogbox({ children, ExpertsList }) {
         })
         console.log("Room created with id:", result);
         setLoading(false);
+        setOpenDailog(false)
+        router.push(`/discussion-room/${result}`);
     }
     return (
         <div>
-            <Dialog>
+            <Dialog open = {openDialog} onOpenChange = {setOpenDailog}>
                 <DialogTrigger>{children}</DialogTrigger>
                 <DialogContent>
                     <DialogHeader>

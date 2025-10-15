@@ -4,11 +4,14 @@ import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { UserButton } from "@stackframe/stack";
-import { AIModel, getToken } from "@/services/GlobalServices";
+import { AIModel, AIModelToGenerateFeedbackAndNotes, getToken } from "@/services/GlobalServices";
 import { AiExpertsList } from "@/services/Options";
 import { useParams } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 function floatTo16BitPCM(float32Array) {
   const buffer = new ArrayBuffer(float32Array.length * 2);
@@ -24,7 +27,6 @@ function floatTo16BitPCM(float32Array) {
 export default function Page() {
   const { roomid } = useParams();
   const DiscussionRoomData = useQuery(api.InterviewRoom.GetDiscussionRoom, { id: roomid });
-
   const [expert, setExpert] = useState(null);
   const [enableMic, setEnableMic] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +34,11 @@ export default function Page() {
   const [currentTranscript, setCurrentTranscript] = useState("");
   const [accumulatedText, setAccumulatedText] = useState("");
   const [aiResponses, setAiResponses] = useState([]);
+  const [enableFeedbackNotes, setEnableFeedbackNotes] = useState(false);
+  const [feedbackAndNotes, setFeedbackAndNotes] = useState("");
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
+  const updateConversation = useMutation(api.InterviewRoom.updateDiscussionRoom);
+  const updateSummary = useMutation(api.InterviewRoom.updateSummary);
   const accumulationTimerRef = useRef(null);
 
   const mediaStreamRef = useRef(null);
@@ -71,6 +78,72 @@ export default function Page() {
     };
   }, []);
 
+  const saveConversation = async (transcriptsList, aiResponsesList) => {
+    try {
+      await updateConversation({
+        id: DiscussionRoomData._id,
+        conversation: transcriptsList.map((t, idx) => ({
+          userMessage: t.text,
+          userTimestamp: t.timestamp,
+          userConfidence: t.confidence,
+          turnOrder: t.turnOrder,
+          aiResponse: aiResponsesList[idx]?.aiText || "",
+          aiTimestamp: aiResponsesList[idx]?.timestamp || "",
+        }))
+      });
+      console.log("Conversation saved successfully");
+    } catch (error) {
+      console.error("Failed to save conversation:", error);
+    }
+  };
+
+  const saveSummaryToDatabase = async (summaryText) => {
+    try {
+      await updateSummary({
+        id: DiscussionRoomData._id,
+        summary: summaryText,
+      }); 
+      toast('Summary saved successfully', { type: 'success' });
+      console.log("Summary saved to database successfully");
+    } catch (error) {
+      console.error("Failed to save summary:", error);
+      toast('Failed to save summary', { type: 'error' });
+      throw error;
+    }
+  };
+
+
+  const generateFeedbackAndNotes = async () => {
+    if (transcripts.length === 0) {
+      alert("No conversation to generate feedback from!");
+      return;
+    }
+
+    setIsGeneratingFeedback(true);
+    try {
+      const conversationData = transcripts.map((t, idx) => ({
+        userMessage: t.text,
+        aiResponse: aiResponses[idx]?.aiText || "",
+      }));
+
+      console.log("Generating feedback for conversation...");
+      const feedback = await AIModelToGenerateFeedbackAndNotes(
+        DiscussionRoomData.coachOptions,
+        conversationData
+      );
+
+      setFeedbackAndNotes(feedback);
+      await saveSummaryToDatabase(feedback);
+
+      console.log("Feedback generated and saved successfully");
+    } catch (error) {
+      console.error("Error generating feedback:", error);
+      setFeedbackAndNotes("Error: Could not generate feedback. Please try again.");
+    } finally {
+      setIsGeneratingFeedback(false);
+    }
+  };
+
   const connectToServer = async () => {
     if (isLoading || enableMic) return;
     setIsLoading(true);
@@ -94,7 +167,7 @@ export default function Page() {
         console.log("WebSocket connected successfully!");
       };
 
-      ws.onmessage = (msg) => {
+      ws.onmessage = async (msg) => {
         const data = JSON.parse(msg.data);
         console.log("Message received:", data);
 
@@ -102,6 +175,9 @@ export default function Page() {
           console.log("Session started successfully");
           setTranscripts([]);
           setCurrentTranscript("");
+          setAiResponses([]);
+          setAccumulatedText("");
+          setFeedbackAndNotes("");
         } else if (data.type === "Turn" && data.transcript) {
           const formatted = data.turn_is_formatted;
 
@@ -113,30 +189,53 @@ export default function Page() {
             const newText = accumulatedText ? accumulatedText + " " + data.transcript : data.transcript;
             setAccumulatedText(newText);
             setCurrentTranscript("");
+
             accumulationTimerRef.current = setTimeout(async () => {
               if (newText.trim()) {
-                const aiResponseText = await AIModel(
-                  DiscussionRoomData.topic,
-                  DiscussionRoomData.coachOptions,
-                  newText
-                );
-                setTranscripts(prev => [
-                  ...prev,
-                  {
+                try {
+                  const aiResponseText = await AIModel(
+                    DiscussionRoomData.topic,
+                    DiscussionRoomData.coachOptions,
+                    newText
+                  );
+
+                  const newTranscript = {
                     text: newText,
                     timestamp: new Date().toLocaleTimeString(),
                     confidence: data.end_of_turn_confidence,
                     turnOrder: data.turn_order,
-                  },
-                ]);
-                setAiResponses(prev => [
-                  ...prev,
-                  {
+                  };
+
+                  const newAiResponse = {
                     aiText: aiResponseText,
                     timestamp: new Date().toLocaleTimeString(),
-                  },
-                ]);
-                setAccumulatedText("");
+                  };
+
+                  setTranscripts(prev => {
+                    const updated = [...prev, newTranscript];
+                    return updated;
+                  });
+
+                  setAiResponses(prev => {
+                    const updated = [...prev, newAiResponse];
+                    return updated;
+                  });
+
+                  setAccumulatedText("");
+
+                  setTimeout(async () => {
+                    setTranscripts(currentTranscripts => {
+                      setAiResponses(currentAiResponses => {
+                        saveConversation(currentTranscripts, currentAiResponses);
+                        return currentAiResponses;
+                      });
+                      return currentTranscripts;
+                    });
+                  }, 100);
+
+                } catch (error) {
+                  console.error("Error getting AI response:", error);
+                }
               }
             }, 5000);
           } else {
@@ -157,6 +256,7 @@ export default function Page() {
       ws.onclose = (ev) => {
         console.log("WebSocket closed:", ev.code, ev.reason);
       };
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -213,6 +313,40 @@ export default function Page() {
     setIsLoading(true);
 
     try {
+      if (accumulationTimerRef.current) {
+        clearTimeout(accumulationTimerRef.current);
+        accumulationTimerRef.current = null;
+      }
+      let finalTranscripts = [...transcripts];
+      let finalAiResponses = [...aiResponses];
+
+      if (accumulatedText.trim()) {
+        console.log("Processing final accumulated text:", accumulatedText);
+
+        try {
+          const lastAiResponse = await AIModel(
+            DiscussionRoomData.topic,
+            DiscussionRoomData.coachOptions,
+            accumulatedText
+          );
+
+          finalTranscripts.push({
+            text: accumulatedText,
+            timestamp: new Date().toLocaleTimeString(),
+            confidence: null,
+            turnOrder: null,
+          });
+
+          finalAiResponses.push({
+            aiText: lastAiResponse,
+            timestamp: new Date().toLocaleTimeString(),
+          });
+          setTranscripts(finalTranscripts);
+          setAiResponses(finalAiResponses);
+        } catch (error) {
+          console.error("Error processing final text:", error);
+        }
+      }
       if (processorRef.current) {
         processorRef.current.disconnect();
         processorRef.current = null;
@@ -222,21 +356,40 @@ export default function Page() {
         mediaStreamRef.current = null;
       }
       if (audioCtxRef.current) {
-        try { await audioCtxRef.current.close(); } catch (e) { }
+        try {
+          await audioCtxRef.current.close();
+        } catch (e) {
+          console.error("Error closing audio context:", e);
+        }
         audioCtxRef.current = null;
       }
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         try {
           wsRef.current.send(JSON.stringify({ type: "Terminate" }));
-        } catch (e) { }
+        } catch (e) {
+          console.error("Error sending terminate:", e);
+        }
+
         setTimeout(() => {
-          try { wsRef.current.close(); } catch (err) { console.error(err); }
+          try {
+            wsRef.current.close();
+          } catch (err) {
+            console.error("Error closing WebSocket:", err);
+          }
           wsRef.current = null;
         }, 100);
       }
+      if (finalTranscripts.length > 0) {
+        await saveConversation(finalTranscripts, finalAiResponses);
+      }
+      setEnableFeedbackNotes(true);
 
       setEnableMic(false);
-      console.log("Disconnected from server");
+      setAccumulatedText("");
+      console.log("Disconnected from server and saved conversation");
+
+    } catch (error) {
+      console.error("Error during disconnect:", error);
     } finally {
       setIsLoading(false);
     }
@@ -286,6 +439,68 @@ export default function Page() {
               </Button>
             )}
           </div>
+
+          {/* Feedback and Notes Section */}
+          {enableFeedbackNotes && (
+            <div className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Feedback & Notes</CardTitle>
+                  <CardDescription>
+                    AI-generated insights from your conversation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!feedbackAndNotes ? (
+                    <div className="text-center py-8">
+                      <Button
+                        onClick={generateFeedbackAndNotes}
+                        disabled={isGeneratingFeedback || transcripts.length === 0}
+                        className="w-full"
+                      >
+                        {isGeneratingFeedback ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Generating Feedback...
+                          </>
+                        ) : (
+                          "Generate Feedback & Notes"
+                        )}
+                      </Button>
+                      {transcripts.length === 0 && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          No conversation to analyze yet
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="prose prose-sm max-w-none">
+                        <div className="whitespace-pre-wrap text-gray-700 bg-gray-50 p-4 rounded-lg">
+                          {feedbackAndNotes}
+                        </div>
+                      </div>
+                      <Button
+                        onClick={generateFeedbackAndNotes}
+                        variant="outline"
+                        disabled={isGeneratingFeedback}
+                        className="w-full"
+                      >
+                        {isGeneratingFeedback ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Regenerating...
+                          </>
+                        ) : (
+                          "Regenerate Feedback"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
         <div>
@@ -295,7 +510,7 @@ export default function Page() {
               <div className="flex items-center gap-2">
                 {enableMic && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
                 <span className="text-xs text-gray-500">
-                  {enableMic ? "Listening..." : "Offline"}
+                  {enableMic ? "Listening..." : enableFeedbackNotes ? "Notes Ready" : "Offline"}
                 </span>
               </div>
             </div>
@@ -309,7 +524,6 @@ export default function Page() {
 
               {transcripts.map((transcript, index) => (
                 <div key={index} className="space-y-3">
-                  {/* User Message */}
                   <div className="flex justify-end">
                     <div className="max-w-[80%] bg-blue-500 text-white p-3 rounded-2xl rounded-tr-sm shadow-md">
                       <p className="text-sm leading-relaxed">{transcript.text}</p>
@@ -322,7 +536,6 @@ export default function Page() {
                     </div>
                   </div>
 
-                  {/* AI Response */}
                   {aiResponses[index] && (
                     <div className="flex justify-start">
                       <div className="max-w-[80%] bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-sm shadow-sm">
@@ -341,7 +554,6 @@ export default function Page() {
                 </div>
               ))}
 
-              {/* Current Transcript */}
               {currentTranscript && (
                 <div className="flex justify-end">
                   <div className="max-w-[80%] bg-blue-100 text-gray-700 p-3 rounded-2xl rounded-tr-sm shadow-sm">
@@ -351,10 +563,9 @@ export default function Page() {
                 </div>
               )}
 
-              {/* Accumulating text */}
               {accumulatedText && (
-                <div className="flex justify-start">
-                  <div className="max-w-[80%] bg-yellow-50 text-yellow-800 p-3 rounded-2xl rounded-tl-sm shadow-sm border border-yellow-200">
+                <div className="flex justify-end">
+                  <div className="max-w-[80%] bg-yellow-50 text-yellow-800 p-3 rounded-2xl rounded-tr-sm shadow-sm border border-yellow-200">
                     <p className="text-sm">{accumulatedText}</p>
                     <span className="text-xs text-yellow-600 mt-1 block">Processing...</span>
                   </div>
@@ -365,9 +576,8 @@ export default function Page() {
             </div>
           </div>
 
-
           <h2 className="mt-4 text-sm text-gray-600">
-            At the end of your conversation we will automatically generate a feedback and notes from your conversation.
+            At the end of your conversation we will automatically generate feedback and notes from your conversation.
           </h2>
         </div>
       </div>

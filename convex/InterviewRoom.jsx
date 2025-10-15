@@ -27,4 +27,30 @@ export const GetDiscussionRoom = query({
     const result = await ctx.db.get("InterviewRoom", args.id);
     return result;
   }
-})
+});
+
+export const updateDiscussionRoom = mutation({
+  args: {
+    id: v.id("InterviewRoom"),
+    conversation: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const updated = await ctx.db.patch("InterviewRoom", args.id, {
+      conversation: args.conversation,
+    });
+    return updated;
+  }
+});
+
+export const updateSummary = mutation({
+  args: {
+    id: v.id("InterviewRoom"),
+    summary: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const updated = await ctx.db.patch("InterviewRoom", args.id, {
+      summary: args.summary,
+    });
+    return updated;
+  }
+});

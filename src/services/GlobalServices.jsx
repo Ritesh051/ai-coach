@@ -3,37 +3,85 @@ import OpenAI from "openai";
 import { ExpertsList } from "./Options";
 
 export const getToken = async () => {
-  const result = await axios.get('/api/getToken');
+  const result = await axios.get("/api/getToken");
   console.log("Token fetched successfully", result.data);
   return result.data;
-}
+};
+
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
   apiKey: process.env.NEXT_PUBLIC_AI_OPENROUTER,
   dangerouslyAllowBrowser: true,
-})
+});
 
-export const AIModel = async (topic, coachOptions, message) => {
+// Main AI Model function for real-time responses during conversation
+export const AIModel = async (topic, coachOptions, userMessage) => {
   const option = ExpertsList.find(opt => opt.name === coachOptions);
-  const PROMPT = option ? option.prompt.replace('{user_topic}', topic) : "";
+  const PROMPT = option ? option.prompt : "You are a helpful AI assistant.";
 
   try {
     const completion = await openai.chat.completions.create({
-      //meta-llama/llama-3.3-8b-instruct:free
-      //google/gemini-2.0-flash-exp:free
-      //mistralai/mistral-7b-instruct:free
-      //deepseek/deepseek-r1-0528-qwen3-8b:free
       model: "deepseek/deepseek-r1-0528-qwen3-8b:free",
       messages: [
-        { role: "assistant", content: PROMPT },
-        { role: "user", content: message }
+        {
+          role: "assistant",
+          content: `${PROMPT}\n\nTopic: ${topic}\n\nProvide concise, helpful responses during this conversation.`,
+        },
+        {
+          role: "user",
+          content: userMessage,
+        },
       ],
+      temperature: 0.7,
+      max_tokens: 500,
     });
 
-    const aiText = completion.choices?.[0]?.message?.content || "No response";
+    const aiText = completion.choices?.[0]?.message?.content?.trim() || "No response";
     return aiText;
   } catch (error) {
     console.error("AIModel error:", error);
-    return "Error: Could not generate AI response.";
+    return "I apologize, but I'm having trouble responding right now. Please continue.";
+  }
+};
+
+export const AIModelToGenerateFeedbackAndNotes = async (coachOptions, conversation) => {
+  const option = ExpertsList.find(opt => opt.name === coachOptions);
+  const PROMPT = option ? option.summaryPrompt : "Generate helpful feedback and concise notes.";
+
+  try {
+    const conversationText = conversation
+      .map((turn, idx) => {
+        return `Turn ${idx + 1}:\nUser: ${turn.userMessage}\nAI: ${turn.aiResponse}`;
+      })
+      .join("\n\n");
+
+    const completion = await openai.chat.completions.create({
+      /*meta-llama/llama-3.3-8b-instruct:free
+      1. google/gemini-2.0-flash-exp:free
+      2. mistralai/mistral-7b-instruct:free
+      3. deepseek/deepseek-r1-0528-qwen3-8b:free
+      4. deepseek/deepseek-chat-v3.1:free 
+      5. alibaba/tongyi-deepresearch-30b-a3b:free
+      */
+      model: "deepseek/deepseek-r1-0528-qwen3-8b:free",
+      messages: [
+        {
+          role: "assistant",
+          content: PROMPT,
+        },
+        {
+          role: "user",
+          content: `Here is the conversation:\n\n${conversationText}\n\nPlease provide a detailed feedback summary and short, well-structured notes based on the above discussion.`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    const aiText = completion.choices?.[0]?.message?.content?.trim() || "No response";
+    return aiText;
+  } catch (error) {
+    console.error("AIModelToGenerateFeedbackAndNotes error:", error);
+    return "Error: Could not generate AI feedback or notes.";
   }
 };

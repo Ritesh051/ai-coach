@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import {
     Dialog,
     DialogClose,
@@ -16,6 +16,7 @@ import { useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
 import { LoaderCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { UserContext } from '@/app/_context/UserContext';
 function Dialogbox({ children, ExpertsList }) {
 
     const [selectedExpert, setSelectedExpert] = useState();
@@ -24,13 +25,15 @@ function Dialogbox({ children, ExpertsList }) {
     const [openDialog, setOpenDailog] = useState(false);
     const router  = useRouter();
     const createDiscussionRoom = useMutation(api.InterviewRoom.createNewRoom);
+    const {userData} = useContext(UserContext)
     
     const onClickNext = async () => {
         setLoading(true);
         const result = await createDiscussionRoom({
             topic: topic,
             expertName: selectedExpert,
-            coachOptions: ExpertsList.name
+            coachOptions: ExpertsList.name,
+            uid : userData?._id
         })
         console.log("Room created with id:", result);
         setLoading(false);

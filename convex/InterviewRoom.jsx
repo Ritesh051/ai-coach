@@ -8,6 +8,7 @@ export const createNewRoom = mutation({
     topic: v.string(),
     expertName: v.string(),
     conversation: v.optional(v.any()),
+    uid : v.id("users")
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("InterviewRoom", {
@@ -15,6 +16,7 @@ export const createNewRoom = mutation({
       topic: args.topic,
       expertName: args.expertName,
       conversation: args.conversation ?? null,
+      uid: args.uid
     });
   },
 });
@@ -52,5 +54,18 @@ export const updateSummary = mutation({
       summary: args.summary,
     });
     return updated;
+  }
+});
+
+export const GetAllDiscussionRooms = query({
+  args: {
+    uid: v.id("users")
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db.query("InterviewRoom")
+      .filter(q => q.eq(q.field("uid"), args.uid))
+      .order("desc")
+      .collect();
+    return result;
   }
 });

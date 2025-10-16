@@ -4,7 +4,6 @@ import { ExpertsList } from "./Options";
 
 export const getToken = async () => {
   const result = await axios.get("/api/getToken");
-  console.log("Token fetched successfully", result.data);
   return result.data;
 };
 
@@ -14,7 +13,6 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true,
 });
 
-// Main AI Model function for real-time responses during conversation
 export const AIModel = async (topic, coachOptions, userMessage) => {
   const option = ExpertsList.find(opt => opt.name === coachOptions);
   const PROMPT = option ? option.prompt : "You are a helpful AI assistant.";
@@ -49,11 +47,13 @@ export const AIModelToGenerateFeedbackAndNotes = async (coachOptions, conversati
   const PROMPT = option ? option.summaryPrompt : "Generate helpful feedback and concise notes.";
 
   try {
-    const conversationText = conversation
+    const safeConversation = Array.isArray(conversation) ? conversation : [];
+    const conversationText = safeConversation
       .map((turn, idx) => {
         return `Turn ${idx + 1}:\nUser: ${turn.userMessage}\nAI: ${turn.aiResponse}`;
       })
       .join("\n\n");
+
 
     const completion = await openai.chat.completions.create({
       /*meta-llama/llama-3.3-8b-instruct:free

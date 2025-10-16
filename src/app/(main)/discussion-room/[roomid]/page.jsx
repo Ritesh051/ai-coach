@@ -46,6 +46,9 @@ export default function Page() {
   const audioCtxRef = useRef(null);
   const processorRef = useRef(null);
   const transcriptEndRef = useRef(null);
+  const transcriptsRef = useRef([]);
+  const aiResponsesRef = useRef([]);
+
 
   useEffect(() => {
     if (DiscussionRoomData) {
@@ -57,6 +60,15 @@ export default function Page() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcripts, currentTranscript]);
+
+  useEffect(() => {
+    transcriptsRef.current = transcripts;
+  }, [transcripts]);
+
+  useEffect(() => {
+    aiResponsesRef.current = aiResponses;
+  }, [aiResponses]);
+
 
   useEffect(() => {
     return () => {
@@ -91,8 +103,10 @@ export default function Page() {
           aiTimestamp: aiResponsesList[idx]?.timestamp || "",
         }))
       });
+      toast('Conversation saved successfully', { type: 'success' });
       console.log("Conversation saved successfully");
     } catch (error) {
+      toast('Failed to save conversation', { type: 'error' });
       console.error("Failed to save conversation:", error);
     }
   };
@@ -102,7 +116,7 @@ export default function Page() {
       await updateSummary({
         id: DiscussionRoomData._id,
         summary: summaryText,
-      }); 
+      });
       toast('Summary saved successfully', { type: 'success' });
       console.log("Summary saved to database successfully");
     } catch (error) {
@@ -115,7 +129,7 @@ export default function Page() {
 
   const generateFeedbackAndNotes = async () => {
     if (transcripts.length === 0) {
-      alert("No conversation to generate feedback from!");
+      toast("No conversation to generate feedback from!", { type: "warning" });
       return;
     }
 
@@ -134,9 +148,10 @@ export default function Page() {
 
       setFeedbackAndNotes(feedback);
       await saveSummaryToDatabase(feedback);
-
+      toast('Feedback generated and saved successfully', { type: 'success' });
       console.log("Feedback generated and saved successfully");
     } catch (error) {
+      toast('Error generating feedback. Please try again.', { type: 'error' });
       console.error("Error generating feedback:", error);
       setFeedbackAndNotes("Error: Could not generate feedback. Please try again.");
     } finally {
@@ -192,52 +207,41 @@ export default function Page() {
 
             accumulationTimerRef.current = setTimeout(async () => {
               if (newText.trim()) {
+                const newTranscript = {
+                  text: newText,
+                  timestamp: new Date().toLocaleTimeString(),
+                  confidence: data.end_of_turn_confidence,
+                  turnOrder: data.turn_order,
+                };
+
+                let aiResponseText = "";
                 try {
-                  const aiResponseText = await AIModel(
+                  aiResponseText = await AIModel(
                     DiscussionRoomData.topic,
                     DiscussionRoomData.coachOptions,
                     newText
                   );
-
-                  const newTranscript = {
-                    text: newText,
-                    timestamp: new Date().toLocaleTimeString(),
-                    confidence: data.end_of_turn_confidence,
-                    turnOrder: data.turn_order,
-                  };
-
-                  const newAiResponse = {
-                    aiText: aiResponseText,
-                    timestamp: new Date().toLocaleTimeString(),
-                  };
-
-                  setTranscripts(prev => {
-                    const updated = [...prev, newTranscript];
-                    return updated;
-                  });
-
-                  setAiResponses(prev => {
-                    const updated = [...prev, newAiResponse];
-                    return updated;
-                  });
-
-                  setAccumulatedText("");
-
-                  setTimeout(async () => {
-                    setTranscripts(currentTranscripts => {
-                      setAiResponses(currentAiResponses => {
-                        saveConversation(currentTranscripts, currentAiResponses);
-                        return currentAiResponses;
-                      });
-                      return currentTranscripts;
-                    });
-                  }, 100);
-
                 } catch (error) {
                   console.error("Error getting AI response:", error);
+                  aiResponseText = "Error: Could not get AI response.";
+                  toast("Failed to get AI response", { type: "error" });
                 }
+
+                const newAiResponse = {
+                  aiText: aiResponseText,
+                  timestamp: new Date().toLocaleTimeString(),
+                };
+                const updatedTranscripts = [...transcriptsRef.current, newTranscript];
+                const updatedAiResponses = [...aiResponsesRef.current, newAiResponse];
+
+                setTranscripts(updatedTranscripts);
+                setAiResponses(updatedAiResponses);
+                setAccumulatedText("");
+
+                await saveConversation(updatedTranscripts, updatedAiResponses);
               }
             }, 5000);
+
           } else {
             setCurrentTranscript(data.transcript);
           }

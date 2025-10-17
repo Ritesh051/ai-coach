@@ -23,39 +23,50 @@ function Dialogbox({ children, ExpertsList }) {
     const [topic, setTopic] = useState('');
     const [Loading, setLoading] = useState(false);
     const [openDialog, setOpenDailog] = useState(false);
-    const router  = useRouter();
+    const router = useRouter();
     const createDiscussionRoom = useMutation(api.InterviewRoom.createNewRoom);
-    const {userData} = useContext(UserContext)
-    
+    const { userData } = useContext(UserContext)
+
     const onClickNext = async () => {
+        if (!userData?._id) {
+            console.error("User data not available");
+            return;
+        }
+
         setLoading(true);
-        const result = await createDiscussionRoom({
-            topic: topic,
-            expertName: selectedExpert,
-            coachOptions: ExpertsList.name,
-            uid : userData?._id
-        })
-        console.log("Room created with id:", result);
-        setLoading(false);
-        setOpenDailog(false)
-        router.push(`/discussion-room/${result}`);
-    }
+        try {
+            const result = await createDiscussionRoom({
+                topic,
+                expertName: selectedExpert,
+                coachOptions: ExpertsList.name,
+                uid: userData._id,
+            });
+
+            console.log("Room created with id:", result);
+            router.push(`/discussion-room/${result}`);
+        } catch (err) {
+            console.error("Error creating discussion room:", err);
+        } finally {
+            setLoading(false);
+            setOpenDailog(false);
+        }
+    };
     return (
         <div>
-            <Dialog open = {openDialog} onOpenChange = {setOpenDailog}>
+            <Dialog open={openDialog} onOpenChange={setOpenDailog}>
                 <DialogTrigger>{children}</DialogTrigger>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{ExpertsList.name}</DialogTitle>
                         <DialogDescription asChild>
                             <div className='mt-4'>
-                                <h2 className='font-medium text-black'>
+                                <h2 className='font-medium text-black dark:text-white'>
                                     Enter your topic to master your skills in {ExpertsList.name}
                                     <Textarea placeholder="Enter your topic here..." className="mt-2"
                                         onChange={(e) => setTopic(e.target.value)} value={topic}
                                     />
                                 </h2>
-                                <h2 className='text-black mt-4'>
+                                <h2 className='text-black dark:text-white mt-4'>
                                     (This is a demo version, actual feature will be available soon!)
                                 </h2>
                                 <div className="grid grid-cols-4 md:grid-col-5 gap-6 mt-4">
@@ -78,8 +89,8 @@ function Dialogbox({ children, ExpertsList }) {
                                         <Button variant={'ghost'}>Cancel</Button>
                                     </DialogClose>
                                     <Button disabled={!selectedExpert || !topic || Loading} onClick={onClickNext} >
-                                    {Loading && <LoaderCircle className='animate-spin'/>}
-                                    Next</Button>
+                                        {Loading && <LoaderCircle className='animate-spin' />}
+                                        Next</Button>
                                 </div>
                             </div>
                         </DialogDescription>

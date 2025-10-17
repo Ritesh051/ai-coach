@@ -2,12 +2,13 @@
 
 import { UserContext } from '@/app/_context/UserContext';
 import { useConvex } from 'convex/react';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { api } from '../../../../../convex/_generated/api';
 import { ExpertsList } from '@/services/Options';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import moment from 'moment';
+import Link from 'next/link';
 
 function History() {
   const convex = useConvex();
@@ -18,17 +19,26 @@ function History() {
     if (userData?._id) GetInterviewRooms();
   }, [userData]);
 
-  const GetInterviewRooms = async () => {
-    try {
-      const result = await convex.query(api.InterviewRoom.GetAllDiscussionRooms, {
-        uid: userData._id
-      });
-      setDiscussionRoomList(result);
-      console.log("All rooms:", result);
-    } catch (err) {
-      console.error("Error fetching rooms:", err);
-    }
-  };
+  const GetInterviewRooms = useCallback(async () => {
+      if (!userData?._id) {
+        console.warn("User data not loaded yet, skipping fetch.");
+        return;
+      }
+      try {
+        const result = await convex.query(api.InterviewRoom.GetAllDiscussionRooms, {
+          uid: userData._id,
+        });
+        setDiscussionRoomList(result);
+        console.log("All rooms:", result);
+      } catch (err) {
+        console.error("Error fetching rooms:", err);
+      }
+    }, [convex, userData?._id]);
+    useEffect(() => {
+      if (userData?._id) {
+        GetInterviewRooms();
+      }
+    }, [userData, GetInterviewRooms]);
 
   const GetAbstractImages = (option) => {
     const coachingOption = ExpertsList.find((item) => item.name === option);
@@ -54,16 +64,16 @@ function History() {
                 height={70}
               />
               <div>
-                <h2 className='font-semibold text-black'>{item.topic}</h2>
-                <h2 className='text-gray-600'>
+                <h2 className='font-semibold text-black dark:text-white'>{item.topic}</h2>
+                <h2 className='text-sm text-gray-600 dark:text-gray-300'>
                   {ExpertsList.find(expert => expert.name === item.coachOptions)?.name || item.coachOptions}
                 </h2>
-                <h2 className='text-gray-600 text-sm'>{moment(item._creationTime).fromNow()}</h2>
+                <h2 className='text-gray-600 dark:text-gray-400 text-sm'>{moment(item._creationTime).fromNow()}</h2>
               </div>
             </div>
-
-
-            <Button variant="outline" className="invisible group-hover:visible">View Notes</Button>
+            <Link href={`/view-summary/${item._id}`}>
+              <Button variant="outline" className="invisible group-hover:visible">View Notes</Button>
+            </Link>
           </div>
         ))}
       </div>

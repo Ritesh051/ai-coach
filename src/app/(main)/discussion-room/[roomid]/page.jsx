@@ -418,7 +418,7 @@ export default function Page() {
                 <span className="text-2xl">👤</span>
               </div>
             )}
-            <h2 className="text-gray-500 mt-2">{expert?.name}</h2>
+            <h2 className="text-gray-500 dark:text-gray-300 mt-2">{expert?.name}</h2>
 
             {enableMic && (
               <div className="mt-2 flex items-center gap-2">
@@ -427,7 +427,7 @@ export default function Page() {
               </div>
             )}
 
-            <div className="p-5 bg-gray-200 px-10 rounded-lg absolute bottom-10 right-10 pointer-events-none">
+            <div className="p-5 bg-gray-200 dark:bg-gray-700 px-10 rounded-lg absolute bottom-10 right-10 pointer-events-none">
               <UserButton />
             </div>
           </div>
@@ -508,12 +508,12 @@ export default function Page() {
         </div>
 
         <div>
-          <div className="h-[60vh] bg-gradient-to-b from-gray-50 to-gray-100 border rounded-3xl shadow-inner flex flex-col p-5 overflow-hidden">
+          <div className="h-[60vh] bg-secondary border rounded-3xl shadow-inner flex flex-col p-5 overflow-hidden">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">Live Chat</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Live Chat</h2>
               <div className="flex items-center gap-2">
                 {enableMic && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                   {enableMic ? "Listening..." : enableFeedbackNotes ? "Notes Ready" : "Offline"}
                 </span>
               </div>
@@ -521,7 +521,7 @@ export default function Page() {
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
               {transcripts.length === 0 && !currentTranscript && (
-                <p className="text-gray-400 text-sm text-center mt-10 italic">
+                <p className="text-gray-400 dark:text-gray-300 text-sm text-center mt-10 italic">
                   Start speaking to see your conversation appear here ✨
                 </p>
               )}
@@ -542,14 +542,14 @@ export default function Page() {
 
                   {aiResponses[index] && (
                     <div className="flex justify-start">
-                      <div className="max-w-[80%] bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-sm shadow-sm">
+                      <div className="max-w-[80%] bg-secondary border border-gray-200 dark:border-gray-700 p-3 rounded-2xl rounded-tl-sm shadow-sm">
                         <p className="text-sm font-medium text-green-700 mb-1">
                           {expert?.name || "AI"}:
                         </p>
-                        <p className="text-sm leading-relaxed text-gray-700">
+                        <p className="text-sm leading-relaxed text-gray-700 dark:text-white">
                           {aiResponses[index].aiText}
                         </p>
-                        <span className="text-xs text-gray-400 mt-1 block">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 mt-1 block">
                           {aiResponses[index].timestamp}
                         </span>
                       </div>

@@ -1,13 +1,11 @@
 "use client";
 import { useUser } from '@stackframe/stack';
 import React from 'react';
-import { Button } from "@/components/ui/button";
 import { ExpertsList } from '@/services/Options';
 import Image from "next/image";
 import { BlurFade } from '@/components/ui/blur-fade';
 import Dialogbox from './Dialogbox';
 
-import { User } from 'lucide-react';
 
 function Features() {
   const user = useUser();
@@ -22,17 +20,9 @@ function Features() {
             Welcome back, {user?.displayName}
           </h2>
         </div>
-        
-        <div className='flex items-center gap-3'>
-          <Button className="bg-blue-500 hover:bg-blue-600 text-white">
-            <User className="mr-2 h-4 w-4" />
-            Profile
-          </Button>
-        </div>
       </div>
 
-      {/* Experts Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mt-10">
+      <div className="grid grid-cols-2 sm:grid-cols-3 grid-rows-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 mt-10">
         {ExpertsList.map((option, index) => (
           <BlurFade key={option.icon} delay={0.25 + index * 0.05} inView>
             <Dialogbox ExpertsList={option}>

@@ -1,3 +1,4 @@
+import "server-only";
 import { StackHandler } from "@stackframe/stack";
 import { stackServerApp } from "../../../stack";
 

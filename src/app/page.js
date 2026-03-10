@@ -10,7 +10,6 @@ import { ArrowRight, Award, MessageSquare, Sparkles, TrendingUp } from "lucide-r
 
 export default function Home() {
   const user = useUser();
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <nav className="sticky top-0 z-50 backdrop-blur-lg bg-white/80 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800">
@@ -230,8 +229,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
@@ -248,8 +245,6 @@ export default function Home() {
           </Link>
         </div>
       </section>
-
-      {/* Footer */}
       <footer className="bg-gray-900 text-gray-300 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
